@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ArbiSim - Real-Time Arbitrage Dashboard</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: #fff;
+        min-height: 100vh;
+      }
+
+      .dashboard {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: auto auto 1fr;
+        gap: 20px;
+        padding: 20px;
+        min-height: 100vh;
+      }
+
+      .header {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+      }
+
+      .header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        color: #00ff9f;
+        text-shadow: 0 0 20px rgba(0, 255, 159, 0.3);
+      }
+
+      .status {
+        display: inline-block;
+        padding: 5px 15px;
+        background: #00ff9f;
+        color: #000;
+        border-radius: 20px;
+        font-weight: bold;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+
+      .card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: transform 0.3s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-5px);
+      }
+
+      .card h3 {
+        color: #00ff9f;
+        margin-bottom: 15px;
+        font-size: 1.2em;
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .metric {
+        text-align: center;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+      }
+
+      .metric-value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #00ff9f;
+      }
+
+      .metric-label {
+        font-size: 0.8em;
+        color: #ccc;
+        margin-top: 5px;
+      }
+
+      .exchange-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .exchange {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+      }
+
+      .exchange-name {
+        font-weight: bold;
+        text-transform: capitalize;
+      }
+
+      .exchange-price {
+        color: #00ff9f;
+        font-family: monospace;
+      }
+
+      .opportunities {
+        grid-column: 1 / -1;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .opportunity {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 100px;
+        gap: 15px;
+        align-items: center;
+        padding: 15px;
+        margin-bottom: 10px;
+        background: rgba(0, 255, 159, 0.1);
+        border-radius: 10px;
+        border-left: 4px solid #00ff9f;
+        animation: slideIn 0.5s ease;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .opportunity.profitable {
+        border-left-color: #00ff9f;
+        background: rgba(0, 255, 159, 0.1);
+      }
+
+      .opportunity.very-profitable {
+        border-left-color: #ff6b35;
+        background: rgba(255, 107, 53, 0.1);
+        animation: glow 1s ease-in-out infinite alternate;
+      }
+
+      @keyframes glow {
+        from {
+          box-shadow: 0 0 5px rgba(255, 107, 53, 0.5);
+        }
+        to {
+          box-shadow: 0 0 20px rgba(255, 107, 53, 0.8);
+        }
+      }
+
+      .profit-value {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #00ff9f;
+      }
+
+      .latency {
+        color: #ccc;
+        font-family: monospace;
+        font-size: 0.9em;
+      }
+
+      .chart-container {
+        height: 200px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 8px;
+        padding: 10px;
+        position: relative;
+      }
+
+      .chart {
+        width: 100%;
+        height: 100%;
+      }
+
+      .risk-indicator {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .risk-bar {
+        flex: 1;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .risk-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+      }
+
+      .risk-low {
+        background: #00ff9f;
+      }
+      .risk-medium {
+        background: #ffd700;
+      }
+      .risk-high {
+        background: #ff6b35;
+      }
+
+      .scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #00ff9f rgba(255, 255, 255, 0.1);
+      }
+
+      .scrollbar::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .scrollbar::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+      }
+
+      .scrollbar::-webkit-scrollbar-thumb {
+        background: #00ff9f;
+        border-radius: 4px;
+      }
+
+      .alert {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        background: rgba(255, 107, 53, 0.9);
+        border-radius: 8px;
+        animation: slideInRight 0.5s ease;
+        z-index: 1000;
+      }
+
+      @keyframes slideInRight {
+        from {
+          transform: translateX(100%);
+        }
+        to {
+          transform: translateX(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dashboard">
+      <div class="header">
+        <h1>🚀 ArbiSim Dashboard</h1>
+        <div class="status" id="status">LIVE</div>
+        <p>Real-Time Arbitrage Detection System</p>
+      </div>
+
+      <div class="card">
+        <h3>📊 Performance Metrics</h3>
+        <div class="metrics-grid">
+          <div class="metric">
+            <div class="metric-value" id="total-opportunities">0</div>
+            <div class="metric-label">Opportunities Found</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="avg-latency">0μs</div>
+            <div class="metric-label">Avg Latency</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="daily-pnl">$0.00</div>
+            <div class="metric-label">Daily P&L</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="win-rate">0%</div>
+            <div class="metric-label">Win Rate</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🏪 Exchange Prices</h3>
+        <div class="exchange-list" id="exchange-prices">
+          <div class="exchange">
+            <span class="exchange-name">Binance</span>
+            <span class="exchange-price">$0.00</span>
+          </div>
+          <div class="exchange">
+            <span class="exchange-name">Coinbase</span>
+            <span class="exchange-price">$0.00</span>
+          </div>
+          <div class="exchange">
+            <span class="exchange-name">Kraken</span>
+            <span class="exchange-price">$0.00</span>
+          </div>
+          <div class="exchange">
+            <span class="exchange-name">Bybit</span>
+            <span class="exchange-price">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>⚠️ Risk Management</h3>
+        <div class="risk-indicator">
+          <span>Exposure:</span>
+          <div class="risk-bar">
+            <div
+              class="risk-fill risk-low"
+              id="exposure-bar"
+              style="width: 25%"
+            ></div>
+          </div>
+          <span id="exposure-text">25%</span>
+        </div>
+        <div class="risk-indicator">
+          <span>Drawdown:</span>
+          <div class="risk-bar">
+            <div
+              class="risk-fill risk-low"
+              id="drawdown-bar"
+              style="width: 5%"
+            ></div>
+          </div>
+          <span id="drawdown-text">5%</span>
+        </div>
+        <div class="metrics-grid">
+          <div class="metric">
+            <div class="metric-value" id="total-exposure">$0</div>
+            <div class="metric-label">Total Exposure</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value" id="active-positions">0</div>
+            <div class="metric-label">Active Positions</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card opportunities">
+        <h3>💰 Live Arbitrage Opportunities</h3>
+        <div id="opportunities-list" class="scrollbar">
+          <div class="opportunity profitable">
+            <div>
+              <strong>BTCUSDT</strong><br />
+              <small>Buy: Binance → Sell: Coinbase</small>
+            </div>
+            <div>
+              <div>$49,834.81 → $50,093.00</div>
+              <small>Spread: $258.19</small>
+            </div>
+            <div class="profit-value">45.3 bps</div>
+            <div class="latency">23μs</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // WebSocket connection for real-time data
+      let ws = null;
+      let reconnectAttempts = 0;
+      const maxReconnectAttempts = 5;
+
+      // Data storage
+      let opportunities = [];
+      let latencies = [];
+      let exchangePrices = {};
+      let metrics = {
+          totalOpportunities: 0,
+          avgLatency: 0,
+          dailyPnL: 0,
+          winRate: 0,
+          totalExposure: 0,
+          activePositions: 0,
+          drawdown: 0
+      };
+
+      function connectWebSocket() {
+          try {
+              ws = new WebSocket('ws://localhost:8080');
+
+              ws.onopen = function() {
+                  console.log('Connected to ArbiSim backend');
+                  document.getElementById('status').textContent = 'LIVE';
+                  document.getElementById('status').style.background = '#00ff9f';
+                  reconnectAttempts = 0;
+              };
+
+              ws.onmessage = function(event) {
+                  const data = JSON.parse(event.data);
+                  handleRealtimeData(data);
+              };
+
+              ws.onclose = function() {
+                  console.log('Disconnected from backend');
+                  document.getElementById('status').textContent = 'OFFLINE';
+                  document.getElementById('status').style.background = '#ff6b35';
+
+                  // Attempt to reconnect
+                  if (reconnectAttempts < maxReconnectAttempts) {
+                      setTimeout(() => {
+                          reconnectAttempts++;
+                          connectWebSocket();
+                      }, 2000);
+                  }
+              };
+
+              ws.onerror = function(error) {
+                  console.error('WebSocket error:', error);
+              };
+
+          } catch (error) {
+              console.error('Failed to connect:', error);
+              // Use demo mode if can't connect
+              startDemoMode();
+          }
+      }
+
+      function handleRealtimeData(data) {
+          switch(data.type) {
+              case 'opportunity':
+                  addOpportunity(data.opportunity);
+                  break;
+              case 'price_update':
+                  updateExchangePrice(data.exchange, data.price);
+                  break;
+              case 'metrics':
+                  updateMetrics(data.metrics);
+                  break;
+              case 'risk_report':
+                  updateRiskIndicators(data.report);
+                  break;
+          }
+      }
+
+      function addOpportunity(opp) {
+          opportunities.unshift(opp);
+          if (opportunities.length > 50) {
+              opportunities = opportunities.slice(0, 50);
+          }
+
+          latencies.push(opp.latency_ns / 1000); // Convert to μs
+          if (latencies.length > 100) {
+              latencies = latencies.slice(-100);
+          }
+
+          metrics.totalOpportunities++;
+          metrics.avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
+
+          renderOpportunities();
+          updateMetricsDisplay();
+      }
+
+      function updateExchangePrice(exchange, price) {
+          exchangePrices[exchange] = price;
+          renderExchangePrices();
+      }
+
+      function updateMetrics(newMetrics) {
+          Object.assign(metrics, newMetrics);
+          updateMetricsDisplay();
+      }
+
+      function updateRiskIndicators(report) {
+          // Update exposure bar
+          const exposurePercent = Math.min((report.total_exposure / 50000) * 100, 100);
+          const exposureBar = document.getElementById('exposure-bar');
+          const exposureText = document.getElementById('exposure-text');
+
+          exposureBar.style.width = exposurePercent + '%';
+          exposureText.textContent = exposurePercent.toFixed(1) + '%';
+
+          if (exposurePercent > 80) {
+              exposureBar.className = 'risk-fill risk-high';
+          } else if (exposurePercent > 50) {
+              exposureBar.className = 'risk-fill risk-medium';
+          } else {
+              exposureBar.className = 'risk-fill risk-low';
+          }
+
+          // Update drawdown bar
+          const drawdownPercent = Math.min(report.current_drawdown * 100, 100);
+          const drawdownBar = document.getElementById('drawdown-bar');
+          const drawdownText = document.getElementById('drawdown-text');
+
+          drawdownBar.style.width = drawdownPercent + '%';
+          drawdownText.textContent = drawdownPercent.toFixed(1) + '%';
+
+          if (drawdownPercent > 10) {
+              drawdownBar.className = 'risk-fill risk-high';
+          } else if (drawdownPercent > 5) {
+              drawdownBar.className = 'risk-fill risk-medium';
+          } else {
+              drawdownBar.className = 'risk-fill risk-low';
+          }
+
+          // Update other risk metrics
+          document.getElementById('total-exposure').textContent = ' + report.total_exposure.toFixed(0);
+          document.getElementById('active-positions').textContent = report.active_positions;
+      }
+
+      function renderOpportunities() {
+          const container = document.getElementById('opportunities-list');
+          container.innerHTML = '';
+
+          opportunities.slice(0, 20).forEach(opp => {
+              const oppDiv = document.createElement('div');
+              const profitClass = opp.profit_bps > 50 ? 'very-profitable' : 'profitable';
+
+              oppDiv.className = `opportunity ${profitClass}`;
+              oppDiv.innerHTML = `
+                  <div>
+                      <strong>${opp.symbol}</strong><br>
+                      <small>Buy: ${opp.buy_exchange} → Sell: ${opp.sell_exchange}</small>
+                  </div>
+                  <div>
+                      <div>${opp.buy_price.toFixed(2)} → ${opp.sell_price.toFixed(2)}</div>
+                      <small>Spread: ${(opp.sell_price - opp.buy_price).toFixed(2)}</small>
+                  </div>
+                  <div class="profit-value">${opp.profit_bps.toFixed(1)} bps</div>
+                  <div class="latency">${(opp.latency_ns / 1000).toFixed(0)}μs</div>
+              `;
+
+              container.appendChild(oppDiv);
+          });
+      }
+
+      function renderExchangePrices() {
+          const container = document.getElementById('exchange-prices');
+          container.innerHTML = '';
+
+          Object.entries(exchangePrices).forEach(([exchange, price]) => {
+              const exchDiv = document.createElement('div');
+              exchDiv.className = 'exchange';
+              exchDiv.innerHTML = `
+                  <span class="exchange-name">${exchange}</span>
+                  <span class="exchange-price">${price.toFixed(2)}</span>
+              `;
+              container.appendChild(exchDiv);
+          });
+      }
+
+      function updateMetricsDisplay() {
+          document.getElementById('total-opportunities').textContent = metrics.totalOpportunities;
+          document.getElementById('avg-latency').textContent = metrics.avgLatency.toFixed(1) + 'μs';
+          document.getElementById('daily-pnl').textContent = ' + metrics.dailyPnL.toFixed(2);
+          document.getElementById('win-rate').textContent = metrics.winRate.toFixed(1) + '%';
+      }
+
+      function startDemoMode() {
+          console.log('Starting demo mode...');
+          document.getElementById('status').textContent = 'DEMO';
+          document.getElementById('status').style.background = '#ffd700';
+
+          // Generate demo data
+          const exchanges = ['binance', 'coinbase', 'kraken', 'bybit'];
+          let basePrice = 50000;
+
+          setInterval(() => {
+              // Generate price updates
+              exchanges.forEach(exchange => {
+                  const variation = (Math.random() - 0.5) * 100;
+                  const price = basePrice + variation;
+                  updateExchangePrice(exchange, price);
+              });
+
+              // Generate occasional opportunities
+              if (Math.random() < 0.3) {
+                  const opportunity = {
+                      symbol: 'BTCUSDT',
+                      buy_exchange: exchanges[Math.floor(Math.random() * exchanges.length)],
+                      sell_exchange: exchanges[Math.floor(Math.random() * exchanges.length)],
+                      buy_price: basePrice + (Math.random() - 0.5) * 50,
+                      sell_price: basePrice + (Math.random() - 0.5) * 50 + 20,
+                      profit_bps: 20 + Math.random() * 40,
+                      latency_ns: (15 + Math.random() * 20) * 1000,
+                      detected_at_ns: Date.now() * 1000000
+                  };
+                  opportunity.sell_price = opportunity.buy_price + (opportunity.profit_bps / 10000) * opportunity.buy_price;
+                  addOpportunity(opportunity);
+              }
+
+              basePrice += (Math.random() - 0.5) * 10;
+          }, 1000);
+      }
+
+      // Initialize dashboard
+      document.addEventListener('DOMContentLoaded', function() {
+          // Try to connect to backend, fallback to demo mode
+          connectWebSocket();
+
+          // Show initial demo opportunity
+          const demoOpp = {
+              symbol: 'BTCUSDT',
+              buy_exchange: 'binance',
+              sell_exchange: 'coinbase',
+              buy_price: 49834.81,
+              sell_price: 50093.00,
+              profit_bps: 45.3,
+              latency_ns: 23000,
+              detected_at_ns: Date.now() * 1000000
+          };
+          addOpportunity(demoOpp);
+      });
+    </script>
+  </body>
+</html>
