@@ -46,11 +46,15 @@
       .status {
         display: inline-block;
         padding: 5px 15px;
-        background: #00ff9f;
+        background: #ff6b35;
         color: #000;
         border-radius: 20px;
         font-weight: bold;
         animation: pulse 2s infinite;
+      }
+
+      .status.connected {
+        background: #00ff9f;
       }
 
       @keyframes pulse {
@@ -120,6 +124,21 @@
         padding: 10px;
         background: rgba(0, 0, 0, 0.2);
         border-radius: 8px;
+        transition: background 0.3s ease;
+      }
+
+      .exchange.updated {
+        background: rgba(0, 255, 159, 0.2);
+        animation: flashUpdate 0.5s ease;
+      }
+
+      @keyframes flashUpdate {
+        0% {
+          background: rgba(0, 255, 159, 0.4);
+        }
+        100% {
+          background: rgba(0, 255, 159, 0.2);
+        }
       }
 
       .exchange-name {
@@ -130,6 +149,7 @@
       .exchange-price {
         color: #00ff9f;
         font-family: monospace;
+        font-size: 1.1em;
       }
 
       .opportunities {
@@ -162,23 +182,29 @@
         }
       }
 
-      .opportunity.profitable {
+      .opportunity.approved {
         border-left-color: #00ff9f;
-        background: rgba(0, 255, 159, 0.1);
+        background: rgba(0, 255, 159, 0.15);
+        box-shadow: 0 0 15px rgba(0, 255, 159, 0.3);
+      }
+
+      .opportunity.rejected {
+        border-left-color: #ff6b35;
+        background: rgba(255, 107, 53, 0.1);
       }
 
       .opportunity.very-profitable {
-        border-left-color: #ff6b35;
-        background: rgba(255, 107, 53, 0.1);
+        border-left-color: #ffd700;
+        background: rgba(255, 215, 0, 0.1);
         animation: glow 1s ease-in-out infinite alternate;
       }
 
       @keyframes glow {
         from {
-          box-shadow: 0 0 5px rgba(255, 107, 53, 0.5);
+          box-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
         }
         to {
-          box-shadow: 0 0 20px rgba(255, 107, 53, 0.8);
+          box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
         }
       }
 
@@ -188,23 +214,14 @@
         color: #00ff9f;
       }
 
+      .profit-value.rejected {
+        color: #ff6b35;
+      }
+
       .latency {
         color: #ccc;
         font-family: monospace;
         font-size: 0.9em;
-      }
-
-      .chart-container {
-        height: 200px;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 8px;
-        padding: 10px;
-        position: relative;
-      }
-
-      .chart {
-        width: 100%;
-        height: 100%;
       }
 
       .risk-indicator {
@@ -256,32 +273,39 @@
         border-radius: 4px;
       }
 
-      .alert {
+      .connection-status {
         position: fixed;
         top: 20px;
         right: 20px;
-        padding: 15px 20px;
-        background: rgba(255, 107, 53, 0.9);
+        padding: 10px 15px;
         border-radius: 8px;
-        animation: slideInRight 0.5s ease;
+        font-weight: bold;
         z-index: 1000;
       }
 
-      @keyframes slideInRight {
-        from {
-          transform: translateX(100%);
-        }
-        to {
-          transform: translateX(0);
-        }
+      .connection-status.connecting {
+        background: rgba(255, 215, 0, 0.9);
+        color: #000;
+      }
+
+      .connection-status.connected {
+        background: rgba(0, 255, 159, 0.9);
+        color: #000;
+      }
+
+      .connection-status.disconnected {
+        background: rgba(255, 107, 53, 0.9);
+        color: #fff;
       }
     </style>
   </head>
   <body>
+    <div class="connection-status" id="connectionStatus">Connecting...</div>
+
     <div class="dashboard">
       <div class="header">
-        <h1>🚀 ArbiSim Dashboard</h1>
-        <div class="status" id="status">LIVE</div>
+        <h1>🚀 ArbiSim Live Dashboard</h1>
+        <div class="status" id="status">CONNECTING</div>
         <p>Real-Time Arbitrage Detection System</p>
       </div>
 
@@ -308,23 +332,23 @@
       </div>
 
       <div class="card">
-        <h3>🏪 Exchange Prices</h3>
+        <h3>🏪 Live Exchange Prices</h3>
         <div class="exchange-list" id="exchange-prices">
-          <div class="exchange">
+          <div class="exchange" id="exchange-binance">
             <span class="exchange-name">Binance</span>
-            <span class="exchange-price">$0.00</span>
+            <span class="exchange-price">$---.--</span>
           </div>
-          <div class="exchange">
+          <div class="exchange" id="exchange-coinbase">
             <span class="exchange-name">Coinbase</span>
-            <span class="exchange-price">$0.00</span>
+            <span class="exchange-price">$---.--</span>
           </div>
-          <div class="exchange">
+          <div class="exchange" id="exchange-kraken">
             <span class="exchange-name">Kraken</span>
-            <span class="exchange-price">$0.00</span>
+            <span class="exchange-price">$---.--</span>
           </div>
-          <div class="exchange">
+          <div class="exchange" id="exchange-bybit">
             <span class="exchange-name">Bybit</span>
-            <span class="exchange-price">$0.00</span>
+            <span class="exchange-price">$---.--</span>
           </div>
         </div>
       </div>
@@ -337,10 +361,10 @@
             <div
               class="risk-fill risk-low"
               id="exposure-bar"
-              style="width: 25%"
+              style="width: 0%"
             ></div>
           </div>
-          <span id="exposure-text">25%</span>
+          <span id="exposure-text">0%</span>
         </div>
         <div class="risk-indicator">
           <span>Drawdown:</span>
@@ -348,10 +372,10 @@
             <div
               class="risk-fill risk-low"
               id="drawdown-bar"
-              style="width: 5%"
+              style="width: 0%"
             ></div>
           </div>
-          <span id="drawdown-text">5%</span>
+          <span id="drawdown-text">0%</span>
         </div>
         <div class="metrics-grid">
           <div class="metric">
@@ -368,17 +392,8 @@
       <div class="card opportunities">
         <h3>💰 Live Arbitrage Opportunities</h3>
         <div id="opportunities-list" class="scrollbar">
-          <div class="opportunity profitable">
-            <div>
-              <strong>BTCUSDT</strong><br />
-              <small>Buy: Binance → Sell: Coinbase</small>
-            </div>
-            <div>
-              <div>$49,834.81 → $50,093.00</div>
-              <small>Spread: $258.19</small>
-            </div>
-            <div class="profit-value">45.3 bps</div>
-            <div class="latency">23μs</div>
+          <div style="text-align: center; padding: 40px; color: #ccc">
+            Waiting for live arbitrage opportunities...
           </div>
         </div>
       </div>
@@ -392,56 +407,84 @@
 
       // Data storage
       let opportunities = [];
-      let latencies = [];
       let exchangePrices = {};
       let metrics = {
           totalOpportunities: 0,
           avgLatency: 0,
           dailyPnL: 0,
-          winRate: 0,
-          totalExposure: 0,
-          activePositions: 0,
-          drawdown: 0
+          winRate: 0
       };
 
       function connectWebSocket() {
+          updateConnectionStatus('connecting');
+
           try {
               ws = new WebSocket('ws://localhost:8080');
 
               ws.onopen = function() {
-                  console.log('Connected to ArbiSim backend');
-                  document.getElementById('status').textContent = 'LIVE';
-                  document.getElementById('status').style.background = '#00ff9f';
+                  console.log('🚀 Connected to ArbiSim backend');
+                  updateConnectionStatus('connected');
                   reconnectAttempts = 0;
               };
 
               ws.onmessage = function(event) {
-                  const data = JSON.parse(event.data);
-                  handleRealtimeData(data);
+                  try {
+                      console.log('Received raw data:', event.data); 
+                      const data = event.data;
+                      handleRealtimeData(data);
+                  } catch (error) {
+                      console.error('Error parsing message:', error);
+                  }
               };
 
               ws.onclose = function() {
-                  console.log('Disconnected from backend');
-                  document.getElementById('status').textContent = 'OFFLINE';
-                  document.getElementById('status').style.background = '#ff6b35';
+                  console.log('📡 Disconnected from backend');
+                  updateConnectionStatus('disconnected');
 
                   // Attempt to reconnect
                   if (reconnectAttempts < maxReconnectAttempts) {
+                      reconnectAttempts++;
                       setTimeout(() => {
-                          reconnectAttempts++;
+                          console.log(`🔄 Reconnect attempt ${reconnectAttempts}/${maxReconnectAttempts}`);
                           connectWebSocket();
-                      }, 2000);
+                      }, 2000 * reconnectAttempts);
+                  } else {
+                      console.log('❌ Max reconnection attempts reached');
+                      startDemoMode();
                   }
               };
 
               ws.onerror = function(error) {
                   console.error('WebSocket error:', error);
+                  updateConnectionStatus('disconnected');
               };
 
           } catch (error) {
               console.error('Failed to connect:', error);
-              // Use demo mode if can't connect
+              updateConnectionStatus('disconnected');
               startDemoMode();
+          }
+      }
+
+      function updateConnectionStatus(status) {
+          const statusEl = document.getElementById('status');
+          const connStatusEl = document.getElementById('connectionStatus');
+
+          if (status === 'connected') {
+              statusEl.textContent = 'LIVE';
+              statusEl.className = 'status connected';
+              connStatusEl.textContent = 'Connected';
+              connStatusEl.className = 'connection-status connected';
+          } else if (status === 'connecting') {
+              statusEl.textContent = 'CONNECTING';
+              statusEl.className = 'status';
+              connStatusEl.textContent = 'Connecting...';
+              connStatusEl.className = 'connection-status connecting';
+          } else {
+              statusEl.textContent = 'OFFLINE';
+              statusEl.className = 'status';
+              connStatusEl.textContent = 'Disconnected';
+              connStatusEl.className = 'connection-status disconnected';
           }
       }
 
@@ -468,31 +511,40 @@
               opportunities = opportunities.slice(0, 50);
           }
 
-          latencies.push(opp.latency_ns / 1000); // Convert to μs
-          if (latencies.length > 100) {
-              latencies = latencies.slice(-100);
-          }
-
           metrics.totalOpportunities++;
-          metrics.avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
-
           renderOpportunities();
-          updateMetricsDisplay();
       }
 
       function updateExchangePrice(exchange, price) {
           exchangePrices[exchange] = price;
-          renderExchangePrices();
+
+          // Update the exchange price display with animation
+          const exchangeEl = document.getElementById(`exchange-${exchange}`);
+          if (exchangeEl) {
+              const priceEl = exchangeEl.querySelector('.exchange-price');
+              priceEl.textContent = `$${price.toFixed(2)}`;
+
+              // Add update animation
+              exchangeEl.classList.add('updated');
+              setTimeout(() => {
+                  exchangeEl.classList.remove('updated');
+              }, 500);
+          }
       }
 
       function updateMetrics(newMetrics) {
           Object.assign(metrics, newMetrics);
-          updateMetricsDisplay();
+
+          document.getElementById('total-opportunities').textContent = metrics.total_opportunities || metrics.totalOpportunities;
+          document.getElementById('avg-latency').textContent = (metrics.avg_latency || metrics.avgLatency).toFixed(1) + 'μs';
+          document.getElementById('daily-pnl').textContent = '$' + (metrics.daily_pnl || metrics.dailyPnL).toFixed(2);
+          document.getElementById('win-rate').textContent = (metrics.win_rate || metrics.winRate).toFixed(1) + '%';
       }
 
       function updateRiskIndicators(report) {
           // Update exposure bar
-          const exposurePercent = Math.min((report.total_exposure / 50000) * 100, 100);
+          const maxExposure = 50000; // $50k max
+          const exposurePercent = Math.min((report.total_exposure / maxExposure) * 100, 100);
           const exposureBar = document.getElementById('exposure-bar');
           const exposureText = document.getElementById('exposure-text');
 
@@ -508,7 +560,7 @@
           }
 
           // Update drawdown bar
-          const drawdownPercent = Math.min(report.current_drawdown * 100, 100);
+          const drawdownPercent = Math.min((report.current_drawdown || 0) * 100, 100);
           const drawdownBar = document.getElementById('drawdown-bar');
           const drawdownText = document.getElementById('drawdown-text');
 
@@ -524,62 +576,64 @@
           }
 
           // Update other risk metrics
-          document.getElementById('total-exposure').textContent = ' + report.total_exposure.toFixed(0);
-          document.getElementById('active-positions').textContent = report.active_positions;
+          document.getElementById('total-exposure').textContent = '
+               + (report.total_exposure || 0).toFixed(0);
+          document.getElementById('active-positions').textContent = report.active_positions || 0;
       }
 
       function renderOpportunities() {
           const container = document.getElementById('opportunities-list');
           container.innerHTML = '';
 
+          if (opportunities.length === 0) {
+              container.innerHTML = '<div style="text-align: center; padding: 40px; color: #ccc;">Waiting for live arbitrage opportunities...</div>';
+              return;
+          }
+
           opportunities.slice(0, 20).forEach(opp => {
               const oppDiv = document.createElement('div');
-              const profitClass = opp.profit_bps > 50 ? 'very-profitable' : 'profitable';
 
-              oppDiv.className = `opportunity ${profitClass}`;
+              let profitClass = 'opportunity';
+              if (opp.approved) {
+                  profitClass += ' approved';
+                  if (opp.profit_bps > 50) {
+                      profitClass += ' very-profitable';
+                  }
+              } else {
+                  profitClass += ' rejected';
+              }
+
+              oppDiv.className = profitClass;
+
+              const spread = (opp.sell_price - opp.buy_price).toFixed(2);
+              const latencyUs = (opp.latency_ns / 1000).toFixed(0);
+              const status = opp.approved ? '✅ APPROVED' : '❌ REJECTED';
+              const statusClass = opp.approved ? '' : 'rejected';
+
               oppDiv.innerHTML = `
                   <div>
                       <strong>${opp.symbol}</strong><br>
-                      <small>Buy: ${opp.buy_exchange} → Sell: ${opp.sell_exchange}</small>
+                      <small>${opp.buy_exchange} → ${opp.sell_exchange}</small><br>
+                      <small style="color: ${opp.approved ? '#00ff9f' : '#ff6b35'}">${status}</small>
                   </div>
                   <div>
                       <div>${opp.buy_price.toFixed(2)} → ${opp.sell_price.toFixed(2)}</div>
-                      <small>Spread: ${(opp.sell_price - opp.buy_price).toFixed(2)}</small>
+                      <small>Spread: ${spread}</small>
                   </div>
-                  <div class="profit-value">${opp.profit_bps.toFixed(1)} bps</div>
-                  <div class="latency">${(opp.latency_ns / 1000).toFixed(0)}μs</div>
+                  <div class="profit-value ${statusClass}">
+                      ${opp.profit_bps.toFixed(1)} bps<br>
+                      <small>Net: ${opp.net_profit_bps.toFixed(1)} bps</small>
+                  </div>
+                  <div class="latency">${latencyUs}μs</div>
               `;
 
               container.appendChild(oppDiv);
           });
       }
 
-      function renderExchangePrices() {
-          const container = document.getElementById('exchange-prices');
-          container.innerHTML = '';
-
-          Object.entries(exchangePrices).forEach(([exchange, price]) => {
-              const exchDiv = document.createElement('div');
-              exchDiv.className = 'exchange';
-              exchDiv.innerHTML = `
-                  <span class="exchange-name">${exchange}</span>
-                  <span class="exchange-price">${price.toFixed(2)}</span>
-              `;
-              container.appendChild(exchDiv);
-          });
-      }
-
-      function updateMetricsDisplay() {
-          document.getElementById('total-opportunities').textContent = metrics.totalOpportunities;
-          document.getElementById('avg-latency').textContent = metrics.avgLatency.toFixed(1) + 'μs';
-          document.getElementById('daily-pnl').textContent = ' + metrics.dailyPnL.toFixed(2);
-          document.getElementById('win-rate').textContent = metrics.winRate.toFixed(1) + '%';
-      }
-
       function startDemoMode() {
-          console.log('Starting demo mode...');
-          document.getElementById('status').textContent = 'DEMO';
-          document.getElementById('status').style.background = '#ffd700';
+          console.log('🎮 Starting demo mode...');
+          updateConnectionStatus('disconnected');
 
           // Generate demo data
           const exchanges = ['binance', 'coinbase', 'kraken', 'bybit'];
@@ -595,42 +649,113 @@
 
               // Generate occasional opportunities
               if (Math.random() < 0.3) {
+                  const buyExchange = exchanges[Math.floor(Math.random() * exchanges.length)];
+                  let sellExchange = exchanges[Math.floor(Math.random() * exchanges.length)];
+                  while (sellExchange === buyExchange) {
+                      sellExchange = exchanges[Math.floor(Math.random() * exchanges.length)];
+                  }
+
+                  const buyPrice = basePrice + (Math.random() - 0.5) * 50;
+                  const profitBps = 10 + Math.random() * 40;
+                  const sellPrice = buyPrice + (profitBps / 10000) * buyPrice;
+                  const approved = profitBps > 20; // Approve if >20 bps
+
                   const opportunity = {
                       symbol: 'BTCUSDT',
-                      buy_exchange: exchanges[Math.floor(Math.random() * exchanges.length)],
-                      sell_exchange: exchanges[Math.floor(Math.random() * exchanges.length)],
-                      buy_price: basePrice + (Math.random() - 0.5) * 50,
-                      sell_price: basePrice + (Math.random() - 0.5) * 50 + 20,
-                      profit_bps: 20 + Math.random() * 40,
+                      buy_exchange: buyExchange,
+                      sell_exchange: sellExchange,
+                      buy_price: buyPrice,
+                      sell_price: sellPrice,
+                      profit_bps: profitBps,
+                      net_profit_bps: profitBps - 20, // Subtract fees
                       latency_ns: (15 + Math.random() * 20) * 1000,
+                      approved: approved,
                       detected_at_ns: Date.now() * 1000000
                   };
-                  opportunity.sell_price = opportunity.buy_price + (opportunity.profit_bps / 10000) * opportunity.buy_price;
+
                   addOpportunity(opportunity);
               }
 
+              // Update metrics
+              updateMetrics({
+                  total_opportunities: metrics.totalOpportunities,
+                  avg_latency: 15 + Math.random() * 10,
+                  daily_pnl: metrics.totalOpportunities * 2.5,
+                  win_rate: 85 + Math.random() * 10
+              });
+
+              // Update risk indicators
+              updateRiskIndicators({
+                  total_exposure: Math.random() * 25000,
+                  current_drawdown: Math.random() * 0.05,
+                  active_positions: Math.floor(Math.random() * 8),
+              });
+
               basePrice += (Math.random() - 0.5) * 10;
-          }, 1000);
+          }, 1500);
       }
 
       // Initialize dashboard
       document.addEventListener('DOMContentLoaded', function() {
-          // Try to connect to backend, fallback to demo mode
+          console.log('🚀 ArbiSim Dashboard Loading...');
+
+          // Try to connect to backend
           connectWebSocket();
 
-          // Show initial demo opportunity
+          // Show initial status
+          updateConnectionStatus('connecting');
+
+          // Add some initial demo data
           const demoOpp = {
               symbol: 'BTCUSDT',
               buy_exchange: 'binance',
               sell_exchange: 'coinbase',
               buy_price: 49834.81,
               sell_price: 50093.00,
-              profit_bps: 45.3,
+              profit_bps: 51.8,
+              net_profit_bps: 31.8,
               latency_ns: 23000,
+              approved: true,
               detected_at_ns: Date.now() * 1000000
           };
-          addOpportunity(demoOpp);
+
+          setTimeout(() => {
+              addOpportunity(demoOpp);
+              updateMetrics({
+                  total_opportunities: 1,
+                  avg_latency: 23,
+                  daily_pnl: 25.91,
+                  win_rate: 85
+              });
+          }, 1000);
       });
+
+      // Add some keyboard shortcuts
+      document.addEventListener('keydown', function(e) {
+          if (e.key === 'r' && e.ctrlKey) {
+              e.preventDefault();
+              console.log('🔄 Manual reconnection attempt');
+              connectWebSocket();
+          }
+
+          if (e.key === 'c' && e.ctrlKey && e.shiftKey) {
+              e.preventDefault();
+              console.log('🧹 Clearing opportunities');
+              opportunities = [];
+              renderOpportunities();
+          }
+      });
+
+      // Show connection help
+      setTimeout(() => {
+          if (ws === null || ws.readyState !== WebSocket.OPEN) {
+              console.log('💡 Connection Tips:');
+              console.log('1. Make sure ArbiSim engine is running');
+              console.log('2. Check that port 8080 is not blocked');
+              console.log('3. Press Ctrl+R to retry connection');
+              console.log('4. Press Ctrl+Shift+C to clear opportunities');
+          }
+      }, 5000);
     </script>
   </body>
 </html>
