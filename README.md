@@ -215,7 +215,7 @@ The system can be configured through various parameters in the source code:
 The system generates various outputs for analysis and monitoring:
 
 ### Live Dashboard
-![Dashboard Demo](output/dashboard.mp4)
+https://github.com/user-attachments/assets/07b8ea39-c49e-4e2f-a35b-2ce822ccab84
 
 *Real-time trading dashboard showing live opportunities, exchange prices, and risk metrics*
 
@@ -230,7 +230,7 @@ The system generates various outputs for analysis and monitoring:
 *Comprehensive performance benchmarking results demonstrating system capabilities*
 
 ### ArbiSim Engine Output
-![Engine Output](output/output_arbitrage.mp4)
+https://github.com/user-attachments/assets/ae0f688a-29aa-410e-a807-1623a9de571d
 
 *Live console output from the ArbiSim engine showing real-time opportunity detection*
 
