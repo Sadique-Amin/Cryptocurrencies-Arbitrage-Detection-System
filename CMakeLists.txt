@@ -49,11 +49,6 @@ add_executable(arbisim
     src/main.cpp
 )
 
-add_executable(dashboard_server
-    src/dashboard_main.cpp
-    src/dashboard_websocket.cpp
-)
-
 # Link only essential libraries
 target_link_libraries(arbisim PRIVATE
     Threads::Threads
