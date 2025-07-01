@@ -245,12 +245,26 @@ namespace arbisim
             arbitrage_log_ << "timestamp,symbol,buy_exchange,sell_exchange,buy_price,sell_price,profit_bps,net_profit_bps,latency_ns,decision\n";
 
 #ifdef HAVE_BOOST
-            // Set up more liberal risk management (full version)
-            risk_manager_.set_risk_limits(5.0, 500000.0, 1.0, 2.0, 2000.0, 0.10);
+
+            risk_manager_.set_risk_limits(
+                20.0,      // max_position_size: 20 BTC per exchange (was 10.0)
+                5000000.0, // max_total_exposure: $5M (was $2M)
+                10.0,      // max_single_trade_size: 10 BTC (was 5.0)
+                -5.0,      // min_profit_after_fees: NEGATIVE 5 bps (allow losses!)
+                50000.0,   // max_daily_loss: $50K (was $10K)
+                0.50       // max_drawdown: 50% (was 20%)
+            );
+
+            // Reset positions to start clean
             risk_manager_.reset_all_positions();
+
+            std::cout << "[INIT] Risk limits set to ULTRA-LIBERAL mode" << std::endl;
+            std::cout << "[INIT] - Max position: 20 BTC per exchange" << std::endl;
+            std::cout << "[INIT] - Max exposure: $5M total" << std::endl;
+            std::cout << "[INIT] - Min profit: -5 bps (ALLOWS LOSSES)" << std::endl;
 #else
             // For simple risk manager, set more liberal limits
-            risk_manager_.set_risk_limits(1.0, 2.0); // 0.5 BTC max, 5 bps min profit
+            risk_manager_.set_risk_limits(10.0, -5.0); // 0.5 BTC max, 5 bps min profit
 #endif
 
             // Add exchanges

@@ -133,7 +133,7 @@ namespace arbisim
                       << ", Max trade: " << max_single_trade_size_
                       << ", Final size: " << recommended_size << std::endl;
 
-            if (recommended_size <= 0.01)
+            if (recommended_size <= 0.001)
             { // Minimum viable trade size - reduced from 0.001 to 0.01
                 assessment.decision = RiskDecision::REJECTED_TRADE_SIZE;
                 assessment.reason = "Trade size too small: " + std::to_string(recommended_size);
@@ -431,7 +431,7 @@ namespace arbisim
                       << " = " << btc_size << " BTC" << std::endl;
 
             // Ensure minimum viable size, but cap at reasonable maximum
-            double final_result = std::max(std::min(btc_size, 2.0), 0.01); // Between 0.01 and 2.0 BTC
+            double final_result = std::max(std::min(btc_size, 10.0), 0.001);
 
             std::cout << "[DEBUG] Final exposure limit result: max(min(" << btc_size << ", 2.0), 0.01) = "
                       << final_result << " BTC" << std::endl;
