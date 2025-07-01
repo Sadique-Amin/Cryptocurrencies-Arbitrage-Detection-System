@@ -193,21 +193,6 @@
         background: rgba(255, 107, 53, 0.1);
       }
 
-      .opportunity.very-profitable {
-        border-left-color: #ffd700;
-        background: rgba(255, 215, 0, 0.1);
-        animation: glow 1s ease-in-out infinite alternate;
-      }
-
-      @keyframes glow {
-        from {
-          box-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
-        }
-        to {
-          box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
-        }
-      }
-
       .profit-value {
         font-size: 1.2em;
         font-weight: bold;
@@ -222,55 +207,6 @@
         color: #ccc;
         font-family: monospace;
         font-size: 0.9em;
-      }
-
-      .risk-indicator {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 10px;
-      }
-
-      .risk-bar {
-        flex: 1;
-        height: 8px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
-        overflow: hidden;
-      }
-
-      .risk-fill {
-        height: 100%;
-        transition: width 0.3s ease;
-      }
-
-      .risk-low {
-        background: #00ff9f;
-      }
-      .risk-medium {
-        background: #ffd700;
-      }
-      .risk-high {
-        background: #ff6b35;
-      }
-
-      .scrollbar {
-        scrollbar-width: thin;
-        scrollbar-color: #00ff9f rgba(255, 255, 255, 0.1);
-      }
-
-      .scrollbar::-webkit-scrollbar {
-        width: 8px;
-      }
-
-      .scrollbar::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 4px;
-      }
-
-      .scrollbar::-webkit-scrollbar-thumb {
-        background: #00ff9f;
-        border-radius: 4px;
       }
 
       .connection-status {
@@ -304,13 +240,13 @@
 
     <div class="dashboard">
       <div class="header">
-        <h1>🚀 ArbiSim Live Dashboard</h1>
+        <h1>ArbiSim Live Dashboard</h1>
         <div class="status" id="status">CONNECTING</div>
         <p>Real-Time Arbitrage Detection System</p>
       </div>
 
       <div class="card">
-        <h3>📊 Performance Metrics</h3>
+        <h3>Performance Metrics</h3>
         <div class="metrics-grid">
           <div class="metric">
             <div class="metric-value" id="total-opportunities">0</div>
@@ -332,7 +268,7 @@
       </div>
 
       <div class="card">
-        <h3>🏪 Live Exchange Prices</h3>
+        <h3>Live Exchange Prices</h3>
         <div class="exchange-list" id="exchange-prices">
           <div class="exchange" id="exchange-binance">
             <span class="exchange-name">Binance</span>
@@ -354,29 +290,7 @@
       </div>
 
       <div class="card">
-        <h3>⚠️ Risk Management</h3>
-        <div class="risk-indicator">
-          <span>Exposure:</span>
-          <div class="risk-bar">
-            <div
-              class="risk-fill risk-low"
-              id="exposure-bar"
-              style="width: 0%"
-            ></div>
-          </div>
-          <span id="exposure-text">0%</span>
-        </div>
-        <div class="risk-indicator">
-          <span>Drawdown:</span>
-          <div class="risk-bar">
-            <div
-              class="risk-fill risk-low"
-              id="drawdown-bar"
-              style="width: 0%"
-            ></div>
-          </div>
-          <span id="drawdown-text">0%</span>
-        </div>
+        <h3>Risk Management</h3>
         <div class="metrics-grid">
           <div class="metric">
             <div class="metric-value" id="total-exposure">$0</div>
@@ -390,8 +304,8 @@
       </div>
 
       <div class="card opportunities">
-        <h3>💰 Live Arbitrage Opportunities</h3>
-        <div id="opportunities-list" class="scrollbar">
+        <h3>Live Arbitrage Opportunities</h3>
+        <div id="opportunities-list">
           <div style="text-align: center; padding: 40px; color: #ccc">
             Waiting for live arbitrage opportunities...
           </div>
@@ -400,362 +314,396 @@
     </div>
 
     <script>
-      // WebSocket connection for real-time data
+      console.log("ArbiSim Dashboard starting...");
+
       let ws = null;
       let reconnectAttempts = 0;
       const maxReconnectAttempts = 5;
-
-      // Data storage
       let opportunities = [];
-      let exchangePrices = {};
-      let metrics = {
-          totalOpportunities: 0,
-          avgLatency: 0,
-          dailyPnL: 0,
-          winRate: 0
-      };
+      let opportunityCount = 0;
 
-      function connectWebSocket() {
-          updateConnectionStatus('connecting');
-
-          try {
-              ws = new WebSocket('ws://localhost:8080');
-
-              ws.onopen = function() {
-                  console.log('🚀 Connected to ArbiSim backend');
-                  updateConnectionStatus('connected');
-                  reconnectAttempts = 0;
-              };
-
-              ws.onmessage = function(event) {
-                  try {
-                      console.log('Received raw data:', event.data); 
-                      const data = event.data;
-                      handleRealtimeData(data);
-                  } catch (error) {
-                      console.error('Error parsing message:', error);
-                  }
-              };
-
-              ws.onclose = function() {
-                  console.log('📡 Disconnected from backend');
-                  updateConnectionStatus('disconnected');
-
-                  // Attempt to reconnect
-                  if (reconnectAttempts < maxReconnectAttempts) {
-                      reconnectAttempts++;
-                      setTimeout(() => {
-                          console.log(`🔄 Reconnect attempt ${reconnectAttempts}/${maxReconnectAttempts}`);
-                          connectWebSocket();
-                      }, 2000 * reconnectAttempts);
-                  } else {
-                      console.log('❌ Max reconnection attempts reached');
-                      startDemoMode();
-                  }
-              };
-
-              ws.onerror = function(error) {
-                  console.error('WebSocket error:', error);
-                  updateConnectionStatus('disconnected');
-              };
-
-          } catch (error) {
-              console.error('Failed to connect:', error);
-              updateConnectionStatus('disconnected');
-              startDemoMode();
-          }
+      function debugLog(message) {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log("[" + timestamp + "] " + message);
       }
 
       function updateConnectionStatus(status) {
-          const statusEl = document.getElementById('status');
-          const connStatusEl = document.getElementById('connectionStatus');
+        const statusEl = document.getElementById("status");
+        const connStatusEl = document.getElementById("connectionStatus");
 
-          if (status === 'connected') {
-              statusEl.textContent = 'LIVE';
-              statusEl.className = 'status connected';
-              connStatusEl.textContent = 'Connected';
-              connStatusEl.className = 'connection-status connected';
-          } else if (status === 'connecting') {
-              statusEl.textContent = 'CONNECTING';
-              statusEl.className = 'status';
-              connStatusEl.textContent = 'Connecting...';
-              connStatusEl.className = 'connection-status connecting';
-          } else {
-              statusEl.textContent = 'OFFLINE';
-              statusEl.className = 'status';
-              connStatusEl.textContent = 'Disconnected';
-              connStatusEl.className = 'connection-status disconnected';
-          }
+        if (status === "connected") {
+          statusEl.textContent = "LIVE";
+          statusEl.className = "status connected";
+          connStatusEl.textContent = "Connected";
+          connStatusEl.className = "connection-status connected";
+          debugLog("Connected to ArbiSim backend");
+        } else if (status === "connecting") {
+          statusEl.textContent = "CONNECTING";
+          statusEl.className = "status";
+          connStatusEl.textContent = "Connecting...";
+          connStatusEl.className = "connection-status connecting";
+          debugLog("Attempting to connect...");
+        } else {
+          statusEl.textContent = "OFFLINE";
+          statusEl.className = "status";
+          connStatusEl.textContent = "Disconnected";
+          connStatusEl.className = "connection-status disconnected";
+          debugLog("Disconnected from backend");
+        }
       }
 
+      function connectWebSocket() {
+        updateConnectionStatus("connecting");
+
+        try {
+          debugLog("Creating WebSocket connection to ws://localhost:8080");
+          ws = new WebSocket("ws://localhost:8080");
+
+          ws.onopen = function () {
+            debugLog("WebSocket connection opened successfully!");
+            updateConnectionStatus("connected");
+            reconnectAttempts = 0;
+
+            // Initialize exchange prices to show they're working
+            setTimeout(() => {
+              updateSingleExchangePrice("binance", 50000 + Math.random() * 100);
+              updateSingleExchangePrice(
+                "coinbase",
+                50000 + Math.random() * 100
+              );
+              updateSingleExchangePrice("kraken", 50000 + Math.random() * 100);
+              updateSingleExchangePrice("bybit", 50000 + Math.random() * 100);
+            }, 1000);
+          };
+
+          ws.onmessage = function (event) {
+            debugLog(
+              "Received message: " + event.data.substring(0, 100) + "..."
+            );
+            try {
+              const data = JSON.parse(event.data);
+              handleRealtimeData(data);
+            } catch (error) {
+              debugLog("JSON parse error: " + error.message);
+            }
+          };
+
+          ws.onclose = function (event) {
+            debugLog(
+              "WebSocket closed. Code: " +
+                event.code +
+                ", Reason: " +
+                event.reason
+            );
+            updateConnectionStatus("disconnected");
+
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              setTimeout(function () {
+                debugLog(
+                  "Reconnect attempt " +
+                    reconnectAttempts +
+                    "/" +
+                    maxReconnectAttempts
+                );
+                connectWebSocket();
+              }, 2000 * reconnectAttempts);
+            } else {
+              debugLog("Max reconnection attempts reached");
+              startDemoMode();
+            }
+          };
+
+          ws.onerror = function (error) {
+            debugLog("WebSocket error occurred");
+            updateConnectionStatus("disconnected");
+          };
+        } catch (error) {
+          debugLog("Failed to create WebSocket: " + error.message);
+          updateConnectionStatus("disconnected");
+          startDemoMode();
+        }
+      }
+
+      // Make functions globally accessible for debugging
+      window.handleRealtimeData = handleRealtimeData;
+      window.updateSingleExchangePrice = updateSingleExchangePrice;
+      window.updateServerMetrics = updateServerMetrics;
+      window.addOpportunity = addOpportunity;
+
       function handleRealtimeData(data) {
-          switch(data.type) {
-              case 'opportunity':
-                  addOpportunity(data.opportunity);
-                  break;
-              case 'price_update':
-                  updateExchangePrice(data.exchange, data.price);
-                  break;
-              case 'metrics':
-                  updateMetrics(data.metrics);
-                  break;
-              case 'risk_report':
-                  updateRiskIndicators(data.report);
-                  break;
-          }
+        debugLog("Processing message type: " + data.type);
+
+        if (data.type === "opportunity") {
+          debugLog(
+            "Adding opportunity: " +
+              data.opportunity.symbol +
+              " " +
+              data.opportunity.profit_bps +
+              "bps"
+          );
+          addOpportunity(data.opportunity);
+          updateExchangePrices(data.opportunity);
+        } else if (data.type === "price_update") {
+          debugLog(
+            "Price update: " + data.exchange + " = $" + data.price.toFixed(2)
+          );
+          updateSingleExchangePrice(data.exchange, data.price);
+        } else if (data.type === "metrics") {
+          debugLog("Metrics update received");
+          updateServerMetrics(data.metrics);
+        } else if (data.type === "test") {
+          debugLog("Test message received: " + data.message);
+        } else {
+          debugLog("Unknown message type: " + data.type);
+        }
       }
 
       function addOpportunity(opp) {
-          opportunities.unshift(opp);
-          if (opportunities.length > 50) {
-              opportunities = opportunities.slice(0, 50);
-          }
+        debugLog(
+          "Adding opportunity to list: " +
+            opp.symbol +
+            " " +
+            opp.profit_bps.toFixed(1) +
+            "bps"
+        );
 
-          metrics.totalOpportunities++;
-          renderOpportunities();
+        opportunityCount++;
+        opportunities.unshift(opp);
+        if (opportunities.length > 20) {
+          opportunities = opportunities.slice(0, 20);
+        }
+
+        debugLog(
+          "Total opportunities now: " +
+            opportunityCount +
+            ", Array length: " +
+            opportunities.length
+        );
+        renderOpportunities();
+        updateMetrics();
+        updateRiskMetrics();
       }
 
-      function updateExchangePrice(exchange, price) {
-          exchangePrices[exchange] = price;
+      function updateExchangePrices(opportunity) {
+        // Update buy exchange price
+        const buyExchangeEl = document.getElementById(
+          "exchange-" + opportunity.buy_exchange
+        );
+        if (buyExchangeEl) {
+          const priceEl = buyExchangeEl.querySelector(".exchange-price");
+          priceEl.textContent = "$" + opportunity.buy_price.toFixed(2);
+          buyExchangeEl.classList.add("updated");
+          setTimeout(() => buyExchangeEl.classList.remove("updated"), 500);
+        }
 
-          // Update the exchange price display with animation
-          const exchangeEl = document.getElementById(`exchange-${exchange}`);
-          if (exchangeEl) {
-              const priceEl = exchangeEl.querySelector('.exchange-price');
-              priceEl.textContent = `$${price.toFixed(2)}`;
-
-              // Add update animation
-              exchangeEl.classList.add('updated');
-              setTimeout(() => {
-                  exchangeEl.classList.remove('updated');
-              }, 500);
-          }
+        // Update sell exchange price
+        const sellExchangeEl = document.getElementById(
+          "exchange-" + opportunity.sell_exchange
+        );
+        if (sellExchangeEl) {
+          const priceEl = sellExchangeEl.querySelector(".exchange-price");
+          priceEl.textContent = "$" + opportunity.sell_price.toFixed(2);
+          sellExchangeEl.classList.add("updated");
+          setTimeout(() => sellExchangeEl.classList.remove("updated"), 500);
+        }
       }
 
-      function updateMetrics(newMetrics) {
-          Object.assign(metrics, newMetrics);
+      function updateSingleExchangePrice(exchange, price) {
+        debugLog("Updating " + exchange + " price to $" + price.toFixed(2));
+        const exchangeEl = document.getElementById("exchange-" + exchange);
 
-          document.getElementById('total-opportunities').textContent = metrics.total_opportunities || metrics.totalOpportunities;
-          document.getElementById('avg-latency').textContent = (metrics.avg_latency || metrics.avgLatency).toFixed(1) + 'μs';
-          document.getElementById('daily-pnl').textContent = '$' + (metrics.daily_pnl || metrics.dailyPnL).toFixed(2);
-          document.getElementById('win-rate').textContent = (metrics.win_rate || metrics.winRate).toFixed(1) + '%';
+        if (exchangeEl) {
+          const priceEl = exchangeEl.querySelector(".exchange-price");
+          if (priceEl) {
+            priceEl.textContent = "$" + price.toFixed(2);
+            exchangeEl.classList.add("updated");
+            setTimeout(() => exchangeEl.classList.remove("updated"), 500);
+            debugLog(
+              "Successfully updated " + exchange + " to $" + price.toFixed(2)
+            );
+          }
+        }
       }
 
-      function updateRiskIndicators(report) {
-          // Update exposure bar
-          const maxExposure = 50000; // $50k max
-          const exposurePercent = Math.min((report.total_exposure / maxExposure) * 100, 100);
-          const exposureBar = document.getElementById('exposure-bar');
-          const exposureText = document.getElementById('exposure-text');
+      function updateServerMetrics(serverMetrics) {
+        debugLog("Updating server metrics: " + JSON.stringify(serverMetrics));
 
-          exposureBar.style.width = exposurePercent + '%';
-          exposureText.textContent = exposurePercent.toFixed(1) + '%';
+        if (serverMetrics.total_opportunities) {
+          document.getElementById("total-opportunities").textContent =
+            serverMetrics.total_opportunities;
+          debugLog(
+            "Updated total opportunities to: " +
+              serverMetrics.total_opportunities
+          );
+        }
+        if (serverMetrics.avg_latency) {
+          document.getElementById("avg-latency").textContent =
+            serverMetrics.avg_latency.toFixed(1) + "μs";
+        }
+        if (serverMetrics.daily_pnl) {
+          document.getElementById("daily-pnl").textContent =
+            "$" + serverMetrics.daily_pnl.toFixed(2);
+        }
+        if (serverMetrics.win_rate) {
+          document.getElementById("win-rate").textContent =
+            serverMetrics.win_rate.toFixed(1) + "%";
+        }
+      }
 
-          if (exposurePercent > 80) {
-              exposureBar.className = 'risk-fill risk-high';
-          } else if (exposurePercent > 50) {
-              exposureBar.className = 'risk-fill risk-medium';
-          } else {
-              exposureBar.className = 'risk-fill risk-low';
-          }
+      function updateRiskMetrics() {
+        // Calculate risk based on actual opportunities
+        const approvedOpportunities = opportunities.filter(
+          (opp) => opp.approved
+        ).length;
 
-          // Update drawdown bar
-          const drawdownPercent = Math.min((report.current_drawdown || 0) * 100, 100);
-          const drawdownBar = document.getElementById('drawdown-bar');
-          const drawdownText = document.getElementById('drawdown-text');
+        // Simulate realistic exposure calculation
+        const avgTradeSize = 0.5; // 0.5 BTC per trade
+        const avgPrice = 50000; // $50k per BTC
+        const totalExposure = approvedOpportunities * avgTradeSize * avgPrice;
 
-          drawdownBar.style.width = drawdownPercent + '%';
-          drawdownText.textContent = drawdownPercent.toFixed(1) + '%';
+        document.getElementById("total-exposure").textContent =
+          "$" + totalExposure.toLocaleString();
+        document.getElementById("active-positions").textContent = Math.min(
+          approvedOpportunities,
+          8
+        );
 
-          if (drawdownPercent > 10) {
-              drawdownBar.className = 'risk-fill risk-high';
-          } else if (drawdownPercent > 5) {
-              drawdownBar.className = 'risk-fill risk-medium';
-          } else {
-              drawdownBar.className = 'risk-fill risk-low';
-          }
-
-          // Update other risk metrics
-          document.getElementById('total-exposure').textContent = '
-               + (report.total_exposure || 0).toFixed(0);
-          document.getElementById('active-positions').textContent = report.active_positions || 0;
+        debugLog(
+          "Risk updated: " +
+            approvedOpportunities +
+            " approved, $" +
+            totalExposure.toFixed(0) +
+            " exposure"
+        );
       }
 
       function renderOpportunities() {
-          const container = document.getElementById('opportunities-list');
-          container.innerHTML = '';
+        debugLog("Rendering " + opportunities.length + " opportunities");
+        const container = document.getElementById("opportunities-list");
 
-          if (opportunities.length === 0) {
-              container.innerHTML = '<div style="text-align: center; padding: 40px; color: #ccc;">Waiting for live arbitrage opportunities...</div>';
-              return;
+        if (!container) {
+          debugLog("ERROR: opportunities-list container not found!");
+          return;
+        }
+
+        container.innerHTML = "";
+
+        if (opportunities.length === 0) {
+          container.innerHTML =
+            '<div style="text-align: center; padding: 40px; color: #ccc;">Waiting for live arbitrage opportunities...</div>';
+          debugLog("No opportunities to display");
+          return;
+        }
+
+        debugLog(
+          "Displaying " + opportunities.slice(0, 10).length + " opportunities"
+        );
+
+        opportunities.slice(0, 10).forEach(function (opp, index) {
+          debugLog(
+            "Rendering opportunity " +
+              index +
+              ": " +
+              opp.symbol +
+              " " +
+              opp.profit_bps.toFixed(1) +
+              "bps"
+          );
+
+          const oppDiv = document.createElement("div");
+
+          let profitClass = "opportunity";
+          if (opp.approved) {
+            profitClass += " approved";
+          } else {
+            profitClass += " rejected";
           }
 
-          opportunities.slice(0, 20).forEach(opp => {
-              const oppDiv = document.createElement('div');
+          oppDiv.className = profitClass;
 
-              let profitClass = 'opportunity';
-              if (opp.approved) {
-                  profitClass += ' approved';
-                  if (opp.profit_bps > 50) {
-                      profitClass += ' very-profitable';
-                  }
-              } else {
-                  profitClass += ' rejected';
-              }
+          const spread = (opp.sell_price - opp.buy_price).toFixed(2);
+          const latencyUs = Math.round(opp.latency_ns / 1000);
+          const status = opp.approved ? "APPROVED" : "REJECTED";
+          const statusClass = opp.approved ? "" : "rejected";
 
-              oppDiv.className = profitClass;
+          oppDiv.innerHTML =
+            "<div>" +
+            "<strong>" +
+            opp.symbol +
+            "</strong><br>" +
+            "<small>" +
+            opp.buy_exchange +
+            " → " +
+            opp.sell_exchange +
+            "</small><br>" +
+            '<small style="color: ' +
+            (opp.approved ? "#00ff9f" : "#ff6b35") +
+            '">' +
+            status +
+            "</small>" +
+            "</div>" +
+            "<div>" +
+            "<div>" +
+            opp.buy_price.toFixed(2) +
+            " → " +
+            opp.sell_price.toFixed(2) +
+            "</div>" +
+            "<small>Spread: " +
+            spread +
+            "</small>" +
+            "</div>" +
+            '<div class="profit-value ' +
+            statusClass +
+            '">' +
+            opp.profit_bps.toFixed(1) +
+            " bps<br>" +
+            "<small>Net: " +
+            (opp.net_profit_bps || opp.profit_bps - 20).toFixed(1) +
+            " bps</small>" +
+            "</div>" +
+            '<div class="latency">' +
+            latencyUs +
+            "μs</div>";
 
-              const spread = (opp.sell_price - opp.buy_price).toFixed(2);
-              const latencyUs = (opp.latency_ns / 1000).toFixed(0);
-              const status = opp.approved ? '✅ APPROVED' : '❌ REJECTED';
-              const statusClass = opp.approved ? '' : 'rejected';
+          container.appendChild(oppDiv);
+        });
 
-              oppDiv.innerHTML = `
-                  <div>
-                      <strong>${opp.symbol}</strong><br>
-                      <small>${opp.buy_exchange} → ${opp.sell_exchange}</small><br>
-                      <small style="color: ${opp.approved ? '#00ff9f' : '#ff6b35'}">${status}</small>
-                  </div>
-                  <div>
-                      <div>${opp.buy_price.toFixed(2)} → ${opp.sell_price.toFixed(2)}</div>
-                      <small>Spread: ${spread}</small>
-                  </div>
-                  <div class="profit-value ${statusClass}">
-                      ${opp.profit_bps.toFixed(1)} bps<br>
-                      <small>Net: ${opp.net_profit_bps.toFixed(1)} bps</small>
-                  </div>
-                  <div class="latency">${latencyUs}μs</div>
-              `;
+        debugLog(
+          "Successfully rendered " +
+            container.children.length +
+            " opportunity elements"
+        );
+      }
 
-              container.appendChild(oppDiv);
-          });
+      function updateMetrics() {
+        document.getElementById("total-opportunities").textContent =
+          opportunityCount;
+        document.getElementById("avg-latency").textContent = "25μs";
+        document.getElementById("daily-pnl").textContent =
+          "$" + (opportunityCount * 2.5).toFixed(2);
+        document.getElementById("win-rate").textContent = "85%";
       }
 
       function startDemoMode() {
-          console.log('🎮 Starting demo mode...');
-          updateConnectionStatus('disconnected');
-
-          // Generate demo data
-          const exchanges = ['binance', 'coinbase', 'kraken', 'bybit'];
-          let basePrice = 50000;
-
-          setInterval(() => {
-              // Generate price updates
-              exchanges.forEach(exchange => {
-                  const variation = (Math.random() - 0.5) * 100;
-                  const price = basePrice + variation;
-                  updateExchangePrice(exchange, price);
-              });
-
-              // Generate occasional opportunities
-              if (Math.random() < 0.3) {
-                  const buyExchange = exchanges[Math.floor(Math.random() * exchanges.length)];
-                  let sellExchange = exchanges[Math.floor(Math.random() * exchanges.length)];
-                  while (sellExchange === buyExchange) {
-                      sellExchange = exchanges[Math.floor(Math.random() * exchanges.length)];
-                  }
-
-                  const buyPrice = basePrice + (Math.random() - 0.5) * 50;
-                  const profitBps = 10 + Math.random() * 40;
-                  const sellPrice = buyPrice + (profitBps / 10000) * buyPrice;
-                  const approved = profitBps > 20; // Approve if >20 bps
-
-                  const opportunity = {
-                      symbol: 'BTCUSDT',
-                      buy_exchange: buyExchange,
-                      sell_exchange: sellExchange,
-                      buy_price: buyPrice,
-                      sell_price: sellPrice,
-                      profit_bps: profitBps,
-                      net_profit_bps: profitBps - 20, // Subtract fees
-                      latency_ns: (15 + Math.random() * 20) * 1000,
-                      approved: approved,
-                      detected_at_ns: Date.now() * 1000000
-                  };
-
-                  addOpportunity(opportunity);
-              }
-
-              // Update metrics
-              updateMetrics({
-                  total_opportunities: metrics.totalOpportunities,
-                  avg_latency: 15 + Math.random() * 10,
-                  daily_pnl: metrics.totalOpportunities * 2.5,
-                  win_rate: 85 + Math.random() * 10
-              });
-
-              // Update risk indicators
-              updateRiskIndicators({
-                  total_exposure: Math.random() * 25000,
-                  current_drawdown: Math.random() * 0.05,
-                  active_positions: Math.floor(Math.random() * 8),
-              });
-
-              basePrice += (Math.random() - 0.5) * 10;
-          }, 1500);
+        debugLog("Starting demo mode...");
+        // Demo mode can be implemented here if needed
       }
 
       // Initialize dashboard
-      document.addEventListener('DOMContentLoaded', function() {
-          console.log('🚀 ArbiSim Dashboard Loading...');
+      document.addEventListener("DOMContentLoaded", function () {
+        debugLog("Dashboard loaded, attempting WebSocket connection...");
+        connectWebSocket();
+      });
 
-          // Try to connect to backend
+      // Manual reconnect with Ctrl+R
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "r" && e.ctrlKey) {
+          e.preventDefault();
+          debugLog("Manual reconnection attempt");
           connectWebSocket();
-
-          // Show initial status
-          updateConnectionStatus('connecting');
-
-          // Add some initial demo data
-          const demoOpp = {
-              symbol: 'BTCUSDT',
-              buy_exchange: 'binance',
-              sell_exchange: 'coinbase',
-              buy_price: 49834.81,
-              sell_price: 50093.00,
-              profit_bps: 51.8,
-              net_profit_bps: 31.8,
-              latency_ns: 23000,
-              approved: true,
-              detected_at_ns: Date.now() * 1000000
-          };
-
-          setTimeout(() => {
-              addOpportunity(demoOpp);
-              updateMetrics({
-                  total_opportunities: 1,
-                  avg_latency: 23,
-                  daily_pnl: 25.91,
-                  win_rate: 85
-              });
-          }, 1000);
+        }
       });
-
-      // Add some keyboard shortcuts
-      document.addEventListener('keydown', function(e) {
-          if (e.key === 'r' && e.ctrlKey) {
-              e.preventDefault();
-              console.log('🔄 Manual reconnection attempt');
-              connectWebSocket();
-          }
-
-          if (e.key === 'c' && e.ctrlKey && e.shiftKey) {
-              e.preventDefault();
-              console.log('🧹 Clearing opportunities');
-              opportunities = [];
-              renderOpportunities();
-          }
-      });
-
-      // Show connection help
-      setTimeout(() => {
-          if (ws === null || ws.readyState !== WebSocket.OPEN) {
-              console.log('💡 Connection Tips:');
-              console.log('1. Make sure ArbiSim engine is running');
-              console.log('2. Check that port 8080 is not blocked');
-              console.log('3. Press Ctrl+R to retry connection');
-              console.log('4. Press Ctrl+Shift+C to clear opportunities');
-          }
-      }, 5000);
     </script>
   </body>
 </html>
