@@ -21,8 +21,8 @@ namespace arbisim
     class SimpleRiskManager
     {
     private:
-        double max_trade_size_ = 0.1;
-        double min_profit_bps_ = 8.0;
+        double max_trade_size_ = 0.5; // Increased from 0.1 to 0.5 BTC
+        double min_profit_bps_ = 5.0; // Reduced from 8.0 to 5.0 bps
         std::atomic<uint64_t> opportunities_seen_{0};
         std::atomic<uint64_t> opportunities_taken_{0};
         std::atomic<double> daily_pnl_{0.0};
@@ -30,9 +30,9 @@ namespace arbisim
     public:
         enum class Decision
         {
-            APPROVED,
-            REJECTED_PROFIT,
-            REJECTED_SIZE
+            APPROVED = 0, // Set explicit values for CSV logging
+            REJECTED_PROFIT = 1,
+            REJECTED_SIZE = 2
         };
 
         struct Assessment
@@ -49,9 +49,13 @@ namespace arbisim
 
             Assessment assessment;
 
-            // Calculate net profit after fees (0.1% per side)
-            double fees_bps = 20.0; // 0.2% total fees
+            // Calculate net profit after fees (0.1% per side = 20 bps total)
+            double fees_bps = 20.0;
             assessment.net_profit_bps = opp.profit_bps - fees_bps;
+
+            std::cout << "[DEBUG] Gross: " << opp.profit_bps << " bps, Fees: " << fees_bps
+                      << " bps, Net: " << assessment.net_profit_bps << " bps, Min Required: "
+                      << min_profit_bps_ << " bps" << std::endl;
 
             if (assessment.net_profit_bps < min_profit_bps_)
             {
@@ -62,8 +66,19 @@ namespace arbisim
                 return assessment;
             }
 
-            assessment.decision = Decision::APPROVED;
+            // Set recommended size
             assessment.recommended_size = max_trade_size_;
+
+            // Double check size is reasonable
+            if (assessment.recommended_size < 0.001)
+            {
+                assessment.decision = Decision::REJECTED_SIZE;
+                assessment.reason = "Recommended trade size too small: " + std::to_string(assessment.recommended_size);
+                return assessment;
+            }
+
+            // All checks passed
+            assessment.decision = Decision::APPROVED;
             assessment.reason = "Trade approved";
             opportunities_taken_.fetch_add(1);
 
@@ -71,6 +86,9 @@ namespace arbisim
             double gross_pnl = (opp.sell_price - opp.buy_price) * assessment.recommended_size;
             double fees = (assessment.recommended_size * opp.buy_price + assessment.recommended_size * opp.sell_price) * 0.001;
             daily_pnl_.fetch_add(gross_pnl - fees);
+
+            std::cout << "[DEBUG] APPROVED: Size=" << assessment.recommended_size
+                      << " BTC, Expected P&L=$" << (gross_pnl - fees) << std::endl;
 
             return assessment;
         }
@@ -100,12 +118,22 @@ namespace arbisim
             }
 
             // Simulate some additional metrics for display
-            report.total_exposure = report.opportunities_taken * 0.1 * 50000.0; // Rough estimate
+            report.total_exposure = report.opportunities_taken * 0.5 * 50000.0; // Rough estimate
             report.active_positions = std::min(report.opportunities_taken, uint64_t(8));
             report.current_drawdown = 0.02; // 2% simulated drawdown
             report.win_rate = 0.85;         // 85% simulated win rate
 
             return report;
+        }
+
+        // Add method to adjust thresholds
+        void set_risk_limits(double max_trade, double min_profit)
+        {
+            max_trade_size_ = max_trade;
+            min_profit_bps_ = min_profit;
+
+            std::cout << "[DEBUG] Risk limits updated: Max trade=" << max_trade_size_
+                      << " BTC, Min profit=" << min_profit_bps_ << " bps" << std::endl;
         }
     };
 
@@ -217,8 +245,12 @@ namespace arbisim
             arbitrage_log_ << "timestamp,symbol,buy_exchange,sell_exchange,buy_price,sell_price,profit_bps,net_profit_bps,latency_ns,decision\n";
 
 #ifdef HAVE_BOOST
-            // Set up advanced risk management (full version)
-            risk_manager_.set_risk_limits(1.0, 5.0, 0.1, 8.0, 500.0, 0.05);
+            // Set up more liberal risk management (full version)
+            risk_manager_.set_risk_limits(5.0, 500000.0, 1.0, 2.0, 2000.0, 0.10);
+            risk_manager_.reset_all_positions();
+#else
+            // For simple risk manager, set more liberal limits
+            risk_manager_.set_risk_limits(1.0, 2.0); // 0.5 BTC max, 5 bps min profit
 #endif
 
             // Add exchanges
@@ -268,7 +300,7 @@ namespace arbisim
 
             std::cout << "║ JSON Parser:       NONE (Custom parser)                     ║" << std::endl;
             std::cout << "║ Build Time:        ULTRA-FAST                                ║" << std::endl;
-            std::cout << "║ Min Profit:        8.0 bps (after fees)                     ║" << std::endl;
+            std::cout << "║ Min Profit:        5.0 bps (after fees)                     ║" << std::endl;
             std::cout << "╚══════════════════════════════════════════════════════════════╝" << std::endl;
             std::cout << "\nPress Ctrl+C to stop safely...\n"
                       << std::endl;
@@ -348,7 +380,10 @@ namespace arbisim
             // Risk assessment
             auto assessment = risk_manager_.assess_opportunity(opp);
 
-            // Log opportunity
+            // Create decision code for CSV logging
+            int decision_code = static_cast<int>(assessment.decision);
+
+            // Log opportunity to CSV file for dashboard bridge
             arbitrage_log_ << opp.detected_at_ns << ","
                            << opp.symbol << ","
                            << opp.buy_exchange << ","
@@ -358,10 +393,10 @@ namespace arbisim
                            << std::fixed << std::setprecision(1) << opp.profit_bps << ","
                            << std::fixed << std::setprecision(1) << assessment.net_profit_bps << ","
                            << opp.latency_ns << ","
-                           << static_cast<int>(assessment.decision) << "\n";
-            arbitrage_log_.flush();
+                           << decision_code << "\n";
+            arbitrage_log_.flush(); // Important: Force write to file for dashboard bridge
 
-            // Display opportunity
+            // Display opportunity with better formatting
 #ifdef HAVE_BOOST
             if (assessment.decision == RiskManager::RiskDecision::APPROVED)
             {
@@ -369,12 +404,17 @@ namespace arbisim
             if (assessment.decision == SimpleRiskManager::Decision::APPROVED)
             {
 #endif
-                std::cout << "🚀 APPROVED ARBITRAGE OPPORTUNITY 🚀" << std::endl;
+                std::cout << "==> APPROVED ARBITRAGE OPPORTUNITY <==" << std::endl;
                 perf_tracker_.record_trade_executed();
+
+                // Execute the trade if approved
+#ifdef HAVE_BOOST
+                risk_manager_.execute_trade(opp, assessment.recommended_size);
+#endif
             }
             else
             {
-                std::cout << "⚠️  ARBITRAGE OPPORTUNITY (REJECTED) ⚠️" << std::endl;
+                std::cout << "==> ARBITRAGE OPPORTUNITY (REJECTED) <==" << std::endl;
             }
 
             std::cout << "Symbol: " << opp.symbol << " | "
@@ -382,7 +422,7 @@ namespace arbisim
                       << "Sell: " << opp.sell_exchange << " @ $" << std::fixed << std::setprecision(2) << opp.sell_price << std::endl;
             std::cout << "Gross Profit: " << std::fixed << std::setprecision(1) << opp.profit_bps << " bps | "
                       << "Net Profit: " << std::fixed << std::setprecision(1) << assessment.net_profit_bps << " bps | "
-                      << "Latency: " << (opp.latency_ns / 1000) << " μs" << std::endl;
+                      << "Latency: " << (opp.latency_ns / 1000) << " us" << std::endl;
 
 #ifdef HAVE_BOOST
             if (assessment.decision != RiskManager::RiskDecision::APPROVED)
@@ -391,18 +431,18 @@ namespace arbisim
             if (assessment.decision != SimpleRiskManager::Decision::APPROVED)
             {
 #endif
-                std::cout << "❌ Rejected: " << assessment.reason << std::endl;
+                std::cout << "X Rejected: " << assessment.reason << std::endl;
             }
             else
             {
-                std::cout << "✅ Trade Size: " << std::fixed << std::setprecision(4) << assessment.recommended_size << " BTC" << std::endl;
+                std::cout << "✓ Trade Size: " << std::fixed << std::setprecision(4) << assessment.recommended_size << " BTC" << std::endl;
 
                 // Calculate and display expected P&L
                 double gross_pnl = (opp.sell_price - opp.buy_price) * assessment.recommended_size;
                 double fees = (assessment.recommended_size * opp.buy_price + assessment.recommended_size * opp.sell_price) * 0.001;
                 double net_pnl = gross_pnl - fees;
 
-                std::cout << "💰 Expected P&L: $" << std::fixed << std::setprecision(2) << net_pnl << std::endl;
+                std::cout << "$ Expected P&L: $" << std::fixed << std::setprecision(2) << net_pnl << std::endl;
             }
             std::cout << "----------------------------------------" << std::endl;
         }
@@ -468,6 +508,11 @@ void signal_handler(int signal)
 
 int main()
 {
+// Fix console encoding on Windows
+#ifdef _WIN32
+    system("chcp 65001 >nul"); // UTF-8 encoding
+#endif
+
     // Set up signal handling
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);

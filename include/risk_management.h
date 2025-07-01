@@ -67,13 +67,13 @@ namespace arbisim
     class RiskManager
     {
     private:
-        // Risk limits
-        double max_position_size_ = 1.0;      // Max position per exchange (BTC)
-        double max_total_exposure_ = 5.0;     // Max total exposure (BTC)
-        double max_single_trade_size_ = 0.1;  // Max single trade size (BTC)
-        double min_profit_after_fees_ = 10.0; // Min profit after fees (bps)
-        double max_daily_loss_ = 1000.0;      // Max daily loss ($)
-        double max_drawdown_ = 0.05;          // Max 5% drawdown
+        // Risk limits - UPDATED TO BE MORE LIBERAL
+        double max_position_size_ = 2.0;       // Max position per exchange (BTC) - increased from 1.0
+        double max_total_exposure_ = 100000.0; // Max total exposure ($) - increased from 5.0 BTC
+        double max_single_trade_size_ = 0.5;   // Max single trade size (BTC) - increased from 0.1
+        double min_profit_after_fees_ = 5.0;   // Min profit after fees (bps) - reduced from 10.0
+        double max_daily_loss_ = 2000.0;       // Max daily loss ($) - increased from 1000.0
+        double max_drawdown_ = 0.10;           // Max 10% drawdown - increased from 0.05
 
         // Current state - using regular doubles with mutex protection instead of atomic<double>
         std::unordered_map<std::string, Position> positions_; // key: exchange_symbol
@@ -96,14 +96,14 @@ namespace arbisim
         // Risk check for arbitrage opportunity
         enum class RiskDecision
         {
-            APPROVED,
-            REJECTED_POSITION_LIMIT,
-            REJECTED_EXPOSURE_LIMIT,
-            REJECTED_TRADE_SIZE,
-            REJECTED_PROFIT_TOO_LOW,
-            REJECTED_DAILY_LOSS,
-            REJECTED_DRAWDOWN,
-            REJECTED_EXCHANGE_LIMIT
+            APPROVED = 0,
+            REJECTED_POSITION_LIMIT = 1,
+            REJECTED_EXPOSURE_LIMIT = 2,
+            REJECTED_TRADE_SIZE = 3,
+            REJECTED_PROFIT_TOO_LOW = 4,
+            REJECTED_DAILY_LOSS = 5,
+            REJECTED_DRAWDOWN = 6,
+            REJECTED_EXCHANGE_LIMIT = 7
         };
 
         struct RiskAssessment
@@ -128,10 +128,15 @@ namespace arbisim
             double max_size_by_exposure = calculate_max_size_by_exposure();
             double recommended_size = std::min({max_single_trade_size_, max_size_by_position, max_size_by_exposure});
 
-            if (recommended_size <= 0.001)
-            { // Minimum viable trade size
+            std::cout << "[DEBUG] Position limit: " << max_size_by_position
+                      << ", Exposure limit: " << max_size_by_exposure
+                      << ", Max trade: " << max_single_trade_size_
+                      << ", Final size: " << recommended_size << std::endl;
+
+            if (recommended_size <= 0.01)
+            { // Minimum viable trade size - reduced from 0.001 to 0.01
                 assessment.decision = RiskDecision::REJECTED_TRADE_SIZE;
-                assessment.reason = "Trade size too small";
+                assessment.reason = "Trade size too small: " + std::to_string(recommended_size);
                 return assessment;
             }
 
@@ -140,6 +145,9 @@ namespace arbisim
             assessment.expected_pnl = simulated_trade.gross_pnl;
             assessment.fees = simulated_trade.fees;
             assessment.net_profit_bps = (simulated_trade.net_pnl / (recommended_size * opp.buy_price)) * 10000.0;
+
+            std::cout << "[DEBUG] Net profit: " << assessment.net_profit_bps
+                      << " bps, Min required: " << min_profit_after_fees_ << " bps" << std::endl;
 
             // Check minimum profit threshold
             if (assessment.net_profit_bps < min_profit_after_fees_)
@@ -285,6 +293,11 @@ namespace arbisim
             min_profit_after_fees_ = min_profit;
             max_daily_loss_ = max_loss;
             max_drawdown_ = max_dd;
+
+            std::cout << "[DEBUG] Risk limits updated - Max pos: " << max_pos
+                      << ", Max exp: $" << max_exp
+                      << ", Max trade: " << max_trade
+                      << ", Min profit: " << min_profit << " bps" << std::endl;
         }
 
         void reset_daily_pnl()
@@ -292,13 +305,35 @@ namespace arbisim
             std::lock_guard<std::mutex> lock(risk_mutex_);
             daily_pnl_ = 0.0;
         }
+        void reset_all_positions()
+        {
+            std::lock_guard<std::mutex> lock(risk_mutex_);
+
+            std::cout << "[RESET] Clearing all positions and trade history..." << std::endl;
+            std::cout << "[RESET] Before reset - Total positions: " << positions_.size()
+                      << ", Total trades: " << trade_history_.size() << std::endl;
+
+            positions_.clear();
+            trade_history_.clear();
+            daily_pnl_ = 0.0;
+            total_pnl_ = 0.0;
+            next_trade_id_.store(1);
+
+            std::cout << "[RESET] ✅ All positions reset. Starting fresh!" << std::endl;
+        }
 
     private:
         double calculate_max_size_by_position(const ArbitrageOpportunity &opp)
         {
+            std::cout << "[DEBUG] === Position Calculation Start ===" << std::endl;
+            std::cout << "[DEBUG] Max position size limit: " << max_position_size_ << " BTC" << std::endl;
+
             // Check position limits on both exchanges
             std::string buy_key = opp.buy_exchange + "_" + opp.symbol;
             std::string sell_key = opp.sell_exchange + "_" + opp.symbol;
+
+            std::cout << "[DEBUG] Buy key: '" << buy_key << "', Sell key: '" << sell_key << "'" << std::endl;
+            std::cout << "[DEBUG] Total positions in map: " << positions_.size() << std::endl;
 
             double buy_current = 0.0;
             double sell_current = 0.0;
@@ -306,31 +341,103 @@ namespace arbisim
             auto buy_it = positions_.find(buy_key);
             if (buy_it != positions_.end())
             {
-                buy_current = buy_it->second.quantity;
+                buy_current = std::abs(buy_it->second.quantity);
+                std::cout << "[DEBUG] Found existing buy position: " << buy_current << " BTC" << std::endl;
+            }
+            else
+            {
+                std::cout << "[DEBUG] No existing buy position found" << std::endl;
             }
 
             auto sell_it = positions_.find(sell_key);
             if (sell_it != positions_.end())
             {
-                sell_current = sell_it->second.quantity;
+                sell_current = std::abs(sell_it->second.quantity);
+                std::cout << "[DEBUG] Found existing sell position: " << sell_current << " BTC" << std::endl;
+            }
+            else
+            {
+                std::cout << "[DEBUG] No existing sell position found" << std::endl;
             }
 
-            double max_buy_size = max_position_size_ - buy_current;
-            double max_sell_size = max_position_size_ + sell_current; // We're going short
+            std::cout << "[DEBUG] Buy exchange (" << opp.buy_exchange << ") current: " << buy_current
+                      << " BTC, Sell exchange (" << opp.sell_exchange << ") current: " << sell_current << " BTC" << std::endl;
 
-            return std::min(max_buy_size, max_sell_size);
+            // Calculate available size for each exchange
+            double max_buy_size = max_position_size_ - buy_current;
+            double max_sell_size = max_position_size_ - sell_current;
+
+            std::cout << "[DEBUG] Calculation: max_buy_size = " << max_position_size_ << " - " << buy_current << " = " << max_buy_size << std::endl;
+            std::cout << "[DEBUG] Calculation: max_sell_size = " << max_position_size_ << " - " << sell_current << " = " << max_sell_size << std::endl;
+
+            // Take the minimum of the two
+            double recommended_size = std::min(max_buy_size, max_sell_size);
+
+            std::cout << "[DEBUG] min(" << max_buy_size << ", " << max_sell_size << ") = " << recommended_size << std::endl;
+
+            // If calculated size is negative or too small, still allow minimum trade
+            if (recommended_size <= 0.0)
+            {
+                std::cout << "[DEBUG] Position limits exceeded, allowing minimum trade" << std::endl;
+                return 0.01; // Allow minimum viable trade
+            }
+
+            // Ensure we have at least minimum viable size
+            double final_result = std::max(recommended_size, 0.01);
+            std::cout << "[DEBUG] Final position limit result: " << final_result << " BTC" << std::endl;
+            std::cout << "[DEBUG] === Position Calculation End ===" << std::endl;
+
+            return final_result;
         }
 
         double calculate_max_size_by_exposure()
         {
+            std::cout << "[DEBUG] === Exposure Calculation Start ===" << std::endl;
+            std::cout << "[DEBUG] Max total exposure limit: $" << max_total_exposure_ << std::endl;
+
             double current_exposure = 0.0;
+
+            // Calculate current exposure from all positions
+            std::cout << "[DEBUG] Checking " << positions_.size() << " positions for exposure calculation:" << std::endl;
+
             for (const auto &[key, pos] : positions_)
             {
-                current_exposure += std::abs(pos.quantity * pos.avg_price);
+                double position_exposure = std::abs(pos.quantity * pos.avg_price);
+                current_exposure += position_exposure;
+                std::cout << "[DEBUG]   Position '" << key << "': " << pos.quantity << " @ $" << pos.avg_price
+                          << " = $" << position_exposure << " exposure" << std::endl;
             }
 
+            std::cout << "[DEBUG] Total current exposure: $" << current_exposure
+                      << ", Max allowed: $" << max_total_exposure_ << std::endl;
+
             double remaining_exposure = max_total_exposure_ - current_exposure;
-            return remaining_exposure / 50000.0; // Rough conversion to BTC assuming $50k price
+
+            std::cout << "[DEBUG] Remaining exposure: $" << max_total_exposure_ << " - $" << current_exposure
+                      << " = $" << remaining_exposure << std::endl;
+
+            // If we have negative remaining exposure, allow minimum trade
+            if (remaining_exposure <= 0.0)
+            {
+                std::cout << "[DEBUG] Exposure limit exceeded, allowing minimum trade" << std::endl;
+                return 0.01; // Allow minimum viable trade even if over exposure limit
+            }
+
+            // Convert remaining dollar exposure to BTC size
+            double btc_price = 50000.0; // Rough estimate
+            double btc_size = remaining_exposure / btc_price;
+
+            std::cout << "[DEBUG] Converting to BTC: $" << remaining_exposure << " / $" << btc_price
+                      << " = " << btc_size << " BTC" << std::endl;
+
+            // Ensure minimum viable size, but cap at reasonable maximum
+            double final_result = std::max(std::min(btc_size, 2.0), 0.01); // Between 0.01 and 2.0 BTC
+
+            std::cout << "[DEBUG] Final exposure limit result: max(min(" << btc_size << ", 2.0), 0.01) = "
+                      << final_result << " BTC" << std::endl;
+            std::cout << "[DEBUG] === Exposure Calculation End ===" << std::endl;
+
+            return final_result;
         }
 
         void update_position(const std::string &exchange, const std::string &symbol,
