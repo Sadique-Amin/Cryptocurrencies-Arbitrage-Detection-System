@@ -304,7 +304,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 This project was developed as a demonstration of advanced system architecture and high-frequency trading concepts. 
 
-**Check out my latest SaaS project**: [MokshaMetrics.com](https://mokshametrics.com) - A comprehensive analytics platform that I recently launched. Feel free to explore the platform and see how data-driven insights can transform your business operations.
+**Check out my latest SaaS project**: [MokshaMetrics.com](https://mokshametrics.com).
 
 ---
 
