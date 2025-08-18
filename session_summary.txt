@@ -1,9 +1,9 @@
 ArbiSim Ultra-Fast Session Summary
 ==================================
 Mode: Ultra-Fast (No External Dependencies)
-Opportunities Found: 3449
-Trades Executed: 3389
-Take Rate: 98.2604%
-Win Rate: 98.2886%
-Total P&L: $41800.2
-Total Exposure: $7.05723e+06
+Opportunities Found: 57583
+Trades Executed: 57531
+Take Rate: 99.9097%
+Win Rate: 85%
+Total P&L: $4.26039e+08
+Total Exposure: $1.43828e+09

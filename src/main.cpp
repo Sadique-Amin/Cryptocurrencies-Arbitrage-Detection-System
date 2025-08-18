@@ -85,7 +85,12 @@ namespace arbisim
             // Simulate P&L
             double gross_pnl = (opp.sell_price - opp.buy_price) * assessment.recommended_size;
             double fees = (assessment.recommended_size * opp.buy_price + assessment.recommended_size * opp.sell_price) * 0.001;
-            daily_pnl_.fetch_add(gross_pnl - fees);
+            // daily_pnl_.fetch_add(gross_pnl - fees);
+            double expected = daily_pnl_.load();
+            while (!daily_pnl_.compare_exchange_weak(expected, expected + (gross_pnl - fees)))
+            {
+                // Keep trying until we successfully update the value
+            }
 
             std::cout << "[DEBUG] APPROVED: Size=" << assessment.recommended_size
                       << " BTC, Expected P&L=$" << (gross_pnl - fees) << std::endl;
